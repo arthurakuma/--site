@@ -88,7 +88,7 @@ function getLocation() {
 // عرض خيار الإدخال اليدوي
 function showManualLocation() {
     document.getElementById('manual-location').classList.remove('hidden');
-    document.getElementById('location-text').textContent = "يرجى إدخال الموقع يدويًا";
+    document.getElementById('location-text').textContent = translations[currentLanguage].manualLocationText;
 }
 
 // جلب مواقيت الصلاة من API
@@ -160,8 +160,20 @@ function updateDates(dateData) {
     const gregorian = dateData.gregorian;
     const hijri = dateData.hijri;
 
-    document.getElementById('gregorian-date').textContent = `التاريخ الميلادي: ${gregorian.weekday.ar}, ${toArabicNumerals(gregorian.day)} ${getArabicMonth(gregorian.month.en)} ${toArabicNumerals(gregorian.year)}`;
-    document.getElementById('hijri-date').textContent = `التاريخ الهجري: ${hijri.weekday.ar}, ${toArabicNumerals(hijri.day)} ${hijri.month.ar} ${toArabicNumerals(hijri.year)}`;
+    if (currentLanguage === 'ar') {
+        document.getElementById('gregorian-date').textContent = `التاريخ الميلادي: ${gregorian.weekday.ar}, ${toArabicNumerals(gregorian.day)} ${getArabicMonth(gregorian.month.en)} ${toArabicNumerals(gregorian.year)}`;
+        document.getElementById('hijri-date').textContent = `التاريخ الهجري: ${hijri.weekday.ar}, ${toArabicNumerals(hijri.day)} ${hijri.month.ar} ${toArabicNumerals(hijri.year)}`;
+    } else {
+        document.getElementById('gregorian-date').textContent = `Gregorian Date: ${gregorian.weekday.en}, ${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
+        document.getElementById('hijri-date').textContent = `Hijri Date: ${hijri.weekday.en}, ${hijri.day} ${hijri.month.en} ${hijri.year}`;
+    }
+}
+
+// تحديث عرض التواريخ حسب اللغة الحالية
+function updateDatesDisplay() {
+    if (window.currentDateData) {
+        updateDates(window.currentDateData);
+    }
 }
 
 // تحديث الساعة المحلية
@@ -227,11 +239,11 @@ function getNextPrayer() {
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
     const prayers = [
-        { name: 'الفجر', time: prayerTimes.Fajr, key: 'fajr' },
-        { name: 'الظهر', time: prayerTimes.Dhuhr, key: 'dhuhr' },
-        { name: 'العصر', time: prayerTimes.Asr, key: 'asr' },
-        { name: 'المغرب', time: prayerTimes.Maghrib, key: 'maghrib' },
-        { name: 'العشاء', time: prayerTimes.Isha, key: 'isha' }
+        { name: translations[currentLanguage].prayers.fajr, time: prayerTimes.Fajr, key: 'fajr' },
+        { name: translations[currentLanguage].prayers.dhuhr, time: prayerTimes.Dhuhr, key: 'dhuhr' },
+        { name: translations[currentLanguage].prayers.asr, time: prayerTimes.Asr, key: 'asr' },
+        { name: translations[currentLanguage].prayers.maghrib, time: prayerTimes.Maghrib, key: 'maghrib' },
+        { name: translations[currentLanguage].prayers.isha, time: prayerTimes.Isha, key: 'isha' }
     ];
 
     for (let i = 0; i < prayers.length; i++) {
@@ -334,12 +346,60 @@ document.getElementById('lang-btn').addEventListener('click', () => {
     switchLanguage();
 });
 
+// تبديل اللغة
+function switchLanguage() {
+    // تحديث اتجاه الصفحة
+    document.body.className = currentLanguage === 'en' ? 'ltr' : '';
+    document.documentElement.lang = currentLanguage;
+    document.documentElement.dir = currentLanguage === 'ar' ? 'rtl' : 'ltr';
+
+    // تحديث اسم الموقع
+    document.querySelector('.site-name').textContent = translations[currentLanguage].siteName;
+
+    // تحديث أزرار التحكم
+    document.getElementById('mute-btn').textContent = isMuted ? translations[currentLanguage].unmuteBtn : translations[currentLanguage].muteBtn;
+    document.getElementById('location-btn').textContent = translations[currentLanguage].locationBtn;
+    document.getElementById('lang-btn').textContent = translations[currentLanguage].langBtn;
+
+    // تحديث النصوص الثابتة
+    document.querySelector('.countdown-container h2').textContent = translations[currentLanguage].countdownTitle;
+
+    // تحديث عناوين الصلاة
+    const prayerCards = document.querySelectorAll('.prayer-card');
+    prayerCards.forEach(card => {
+        const prayerKey = card.getAttribute('data-prayer');
+        card.querySelector('h2').textContent = translations[currentLanguage].prayers[prayerKey];
+    });
+
+    // تحديث التواريخ
+    updateDatesDisplay();
+
+    // تحديث النص الموقع
+    updateLocationTextDisplay();
+
+    // تحديث الإدخال اليدوي
+    document.getElementById('country-input').placeholder = translations[currentLanguage].countryPlaceholder;
+    document.getElementById('city-input').placeholder = translations[currentLanguage].cityPlaceholder;
+    document.getElementById('submit-location').textContent = translations[currentLanguage].submitBtn;
+
+    // تحديث الفوتر
+    document.querySelector('.footer p').textContent = currentLanguage === 'ar' 
+        ? '© 2026 صلاتي. جميع الحقوق محفوظة.' 
+        : '© 2026 Salati. All rights reserved.';
+
+    // تحديث الصلاة القادمة
+    if (Object.keys(prayerTimes).length > 0) {
+        updateCountdown();
+    }
+}
+
 async function fetchPrayerTimesManual() {
     const url = `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=2`;
     try {
         const response = await fetch(url);
         const data = await response.json();
         prayerTimes = data.data.timings;
+        window.currentDateData = data.data.date; // حفظ بيانات التاريخ
         updatePrayerTimes();
         updateDates(data.data.date);
         setTimezoneOffset(data.data.meta.timezone);
